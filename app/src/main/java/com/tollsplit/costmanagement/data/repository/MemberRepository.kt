@@ -4,10 +4,13 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.tollsplit.costmanagement.data.model.Member
 import com.tollsplit.costmanagement.data.model.Trip
 import com.tollsplit.costmanagement.utils.ColorUtils
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import java.util.Date
 import kotlin.math.abs
 
@@ -41,19 +44,19 @@ class MemberRepository(private val db: FirebaseFirestore = FirebaseFirestore.get
         awaitClose { listener.remove() }
     }
 
-    suspend fun getMembers(groupId: String): List<Member> {
-        if (groupId.isEmpty()) return emptyList()
+    suspend fun getMembers(groupId: String): List<Member> = withContext(Dispatchers.IO) {
+        if (groupId.isEmpty()) return@withContext emptyList()
         val snapshot = db.collection("members")
             .whereEqualTo("group_id", groupId)
             .whereEqualTo("is_active", true)
             .get()
             .await()
-        return snapshot.documents.mapNotNull { doc ->
+        snapshot.documents.mapNotNull { doc ->
             doc.toObject(Member::class.java)?.copy(id = doc.id)
         }.sortedBy { it.name.lowercase() }
     }
 
-    suspend fun addMember(groupId: String, name: String, phone: String, initialDeposit: Double = 0.0): String {
+    suspend fun addMember(groupId: String, name: String, phone: String, initialDeposit: Double = 0.0): String = withContext(Dispatchers.IO) {
         val memberRef = db.collection("members").document()
         val memberId = memberRef.id
         val avatarColor = ColorUtils.getRandomAvatarColor()
@@ -86,10 +89,10 @@ class MemberRepository(private val db: FirebaseFirestore = FirebaseFirestore.get
         }
 
         batch.commit().await()
-        return memberId
+        memberId
     }
 
-    suspend fun updateMember(id: String, name: String, phone: String) {
+    suspend fun updateMember(id: String, name: String, phone: String) = withContext(Dispatchers.IO) {
         val updates = hashMapOf<String, Any>(
             "name" to name,
             "phone" to phone
@@ -97,11 +100,11 @@ class MemberRepository(private val db: FirebaseFirestore = FirebaseFirestore.get
         db.collection("members").document(id).update(updates).await()
     }
 
-    suspend fun deactivateMember(id: String) {
+    suspend fun deactivateMember(id: String) = withContext(Dispatchers.IO) {
         db.collection("members").document(id).update("is_active", false).await()
     }
 
-    suspend fun addDeposit(groupId: String, memberId: String, amount: Double, note: String, type: String = "deposit") {
+    suspend fun addDeposit(groupId: String, memberId: String, amount: Double, note: String, type: String = "deposit") = withContext(Dispatchers.IO) {
         val memberRef = db.collection("members").document(memberId)
         val actualAmount = if (type == "deduction") -abs(amount) else abs(amount)
 
@@ -136,22 +139,28 @@ class MemberRepository(private val db: FirebaseFirestore = FirebaseFirestore.get
         }.await()
     }
 
-    suspend fun getMemberStats(memberId: String): MemberStats {
-        if (memberId.isEmpty()) return MemberStats()
-        return try {
-            // 1. Deposits
-            val txSnap = db.collection("transactions")
-                .whereEqualTo("member_id", memberId)
-                .whereEqualTo("type", "deposit")
-                .get()
-                .await()
-            val totalDeposits = txSnap.documents.sumOf { (it.getDouble("amount") ?: 0.0) }
+    suspend fun getMemberStats(memberId: String): MemberStats = withContext(Dispatchers.IO) {
+        if (memberId.isEmpty()) return@withContext MemberStats()
+        try {
+            // Fetch deposits and trips in parallel on IO threads
+            val txDeferred = async {
+                db.collection("transactions")
+                    .whereEqualTo("member_id", memberId)
+                    .whereEqualTo("type", "deposit")
+                    .get()
+                    .await()
+            }
+            val tripsDeferred = async {
+                db.collection("trips")
+                    .whereArrayContains("member_ids", memberId)
+                    .get()
+                    .await()
+            }
 
-            // 2. Trips
-            val tripsSnap = db.collection("trips")
-                .whereArrayContains("member_ids", memberId)
-                .get()
-                .await()
+            val txSnap = txDeferred.await()
+            val tripsSnap = tripsDeferred.await()
+
+            val totalDeposits = txSnap.documents.sumOf { (it.getDouble("amount") ?: 0.0) }
 
             var totalSpent = 0.0
             var tripCount = 0

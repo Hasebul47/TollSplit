@@ -5,10 +5,12 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.tollsplit.costmanagement.data.model.Trip
 import com.tollsplit.costmanagement.data.model.TripMember
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import java.util.Date
 import kotlin.math.round
 
@@ -53,13 +55,13 @@ class TripRepository(private val db: FirebaseFirestore = FirebaseFirestore.getIn
         awaitClose { listener.remove() }
     }
 
-    suspend fun getTrips(groupId: String, limitCount: Int = 50): List<Trip> {
-        if (groupId.isEmpty()) return emptyList()
+    suspend fun getTrips(groupId: String, limitCount: Int = 50): List<Trip> = withContext(Dispatchers.IO) {
+        if (groupId.isEmpty()) return@withContext emptyList()
         val snapshot = db.collection("trips")
             .whereEqualTo("group_id", groupId)
             .get()
             .await()
-        return snapshot.documents.mapNotNull { doc ->
+        snapshot.documents.mapNotNull { doc ->
             doc.toObject(Trip::class.java)?.copy(id = doc.id)
         }.sortedWith(
             compareByDescending<Trip> { it.trip_date }
@@ -73,7 +75,7 @@ class TripRepository(private val db: FirebaseFirestore = FirebaseFirestore.getIn
         totalToll: Double,
         memberIds: List<String>,
         note: String
-    ): String {
+    ): String = withContext(Dispatchers.IO) {
         if (memberIds.isEmpty()) throw IllegalArgumentException("At least one member required")
         val perPersonCost = round((totalToll / memberIds.size) * 100.0) / 100.0
         val tripRef = db.collection("trips").document()
@@ -143,10 +145,10 @@ class TripRepository(private val db: FirebaseFirestore = FirebaseFirestore.getIn
             tripId
         }.await()
 
-        return tripId
+        tripId
     }
 
-    suspend fun deleteTrip(tripId: String) {
+    suspend fun deleteTrip(tripId: String) = withContext(Dispatchers.IO) {
         val tripRef = db.collection("trips").document(tripId)
 
         db.runTransaction { transaction ->
@@ -194,8 +196,8 @@ class TripRepository(private val db: FirebaseFirestore = FirebaseFirestore.getIn
         batch.commit().await()
     }
 
-    suspend fun getReportByDateRange(groupId: String, startDate: String, endDate: String): TripReport {
-        if (groupId.isEmpty()) return TripReport()
+    suspend fun getReportByDateRange(groupId: String, startDate: String, endDate: String): TripReport = withContext(Dispatchers.IO) {
+        if (groupId.isEmpty()) return@withContext TripReport()
         val snapshot = db.collection("trips")
             .whereEqualTo("group_id", groupId)
             .get()
@@ -235,7 +237,7 @@ class TripRepository(private val db: FirebaseFirestore = FirebaseFirestore.getIn
 
         val sortedMemberSpending = spendingMap.values.sortedByDescending { it.totalSpent }
 
-        return TripReport(
+        TripReport(
             totalToll = totalToll,
             tripCount = filteredTrips.size,
             trips = filteredTrips,

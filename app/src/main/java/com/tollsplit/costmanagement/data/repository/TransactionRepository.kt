@@ -2,10 +2,12 @@ package com.tollsplit.costmanagement.data.repository
 
 import com.google.firebase.firestore.FirebaseFirestore
 import com.tollsplit.costmanagement.data.model.Transaction
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 
 class TransactionRepository(private val db: FirebaseFirestore = FirebaseFirestore.getInstance()) {
 
@@ -30,13 +32,13 @@ class TransactionRepository(private val db: FirebaseFirestore = FirebaseFirestor
         awaitClose { listener.remove() }
     }
 
-    suspend fun getTransactions(groupId: String, limitCount: Int = 50): List<Transaction> {
-        if (groupId.isEmpty()) return emptyList()
+    suspend fun getTransactions(groupId: String, limitCount: Int = 50): List<Transaction> = withContext(Dispatchers.IO) {
+        if (groupId.isEmpty()) return@withContext emptyList()
         val snapshot = db.collection("transactions")
             .whereEqualTo("group_id", groupId)
             .get()
             .await()
-        return snapshot.documents.mapNotNull { doc ->
+        snapshot.documents.mapNotNull { doc ->
             doc.toObject(Transaction::class.java)?.copy(id = doc.id)
         }.sortedByDescending { it.created_at?.time ?: 0L }.take(limitCount)
     }

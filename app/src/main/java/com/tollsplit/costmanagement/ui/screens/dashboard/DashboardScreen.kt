@@ -80,7 +80,9 @@ import com.tollsplit.costmanagement.utils.ColorUtils
 import com.tollsplit.costmanagement.utils.CurrencyUtils
 import com.tollsplit.costmanagement.utils.DateUtils
 import com.tollsplit.costmanagement.utils.PreferenceManager
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun DashboardScreen(
@@ -117,8 +119,12 @@ fun DashboardScreen(
 
     LaunchedEffect(currentGroupId) {
         if (currentGroupId.isNotEmpty()) {
-            groupStats = groupRepo.getGroupStats(currentGroupId)
-            transactions = txRepo.getTransactions(currentGroupId, 8)
+            withContext(Dispatchers.IO) {
+                val stats = groupRepo.getGroupStats(currentGroupId)
+                val txs = txRepo.getTransactions(currentGroupId, 8)
+                groupStats = stats
+                transactions = txs
+            }
         }
     }
 
@@ -173,10 +179,6 @@ fun DashboardScreen(
                                     currentGroup = g
                                     prefManager.activeGroupId = g.id
                                     showGroupDropdown = false
-                                    coroutineScope.launch {
-                                        groupStats = groupRepo.getGroupStats(g.id)
-                                        transactions = txRepo.getTransactions(g.id, 8)
-                                    }
                                 }
                             )
                         }

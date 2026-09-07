@@ -4,10 +4,12 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.SetOptions
 import com.tollsplit.costmanagement.data.model.AppNotification
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import java.util.Date
 
 class NotificationRepository(private val db: FirebaseFirestore = FirebaseFirestore.getInstance()) {
@@ -29,17 +31,17 @@ class NotificationRepository(private val db: FirebaseFirestore = FirebaseFiresto
         awaitClose { listener.remove() }
     }
 
-    suspend fun sendNotification(message: String): String {
+    suspend fun sendNotification(message: String): String = withContext(Dispatchers.IO) {
         val notifRef = db.collection("notifications").document()
         val data = hashMapOf(
             "message" to message,
             "created_at" to Date()
         )
         notifRef.set(data).await()
-        return notifRef.id
+        notifRef.id
     }
 
-    suspend fun registerPushToken(token: String) {
+    suspend fun registerPushToken(token: String) = withContext(Dispatchers.IO) {
         val tokenRef = db.collection("push_tokens").document(token)
         val data = hashMapOf(
             "token" to token,

@@ -4,6 +4,14 @@ plugins {
     id("com.google.gms.google-services")
 }
 
+val appVersionName: String = (project.findProperty("versionName") as? String)
+    ?: System.getenv("VERSION_NAME")
+    ?: "1.0.2"
+
+val appVersionCode: Int = (project.findProperty("versionCode") as? String
+    ?: System.getenv("VERSION_CODE"))?.toIntOrNull()
+    ?: 2
+
 android {
     namespace = "com.tollsplit.costmanagement"
     compileSdk = 34
@@ -12,8 +20,8 @@ android {
         applicationId = "com.tollsplit.costmanagement"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -24,6 +32,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

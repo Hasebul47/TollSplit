@@ -65,16 +65,20 @@ class MainActivity : ComponentActivity() {
                 // In-App Auto Update Check
                 var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
                 var showUpdateDialog by remember { mutableStateOf(false) }
+                var hasCheckedUpdate by remember { mutableStateOf(false) }
 
                 LaunchedEffect(Unit) {
-                    try {
-                        val info = AppUpdateManager.checkForUpdate(context)
-                        if (info.hasUpdate) {
-                            updateInfo = info
-                            showUpdateDialog = true
+                    if (!hasCheckedUpdate) {
+                        hasCheckedUpdate = true
+                        try {
+                            val info = AppUpdateManager.checkForUpdate(context)
+                            if (info.hasUpdate) {
+                                updateInfo = info
+                                showUpdateDialog = true
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
                         }
-                    } catch (e: Exception) {
-                        e.printStackTrace()
                     }
                 }
 

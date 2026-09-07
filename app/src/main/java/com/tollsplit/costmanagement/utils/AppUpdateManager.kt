@@ -74,18 +74,28 @@ object AppUpdateManager {
             val latestVersion = rawTag.removePrefix("v").trim()
             val releaseNotes = json.optString("body", "Bug fixes and performance improvements.")
 
-            // Find APK in assets
+            // Find APK in assets (prioritize optimized release APK)
             var downloadUrl = ""
+            var fallbackApkUrl = ""
             val assets = json.optJSONArray("assets")
             if (assets != null) {
                 for (i in 0 until assets.length()) {
                     val asset = assets.getJSONObject(i)
                     val name = asset.optString("name", "")
                     if (name.endsWith(".apk", ignoreCase = true)) {
-                        downloadUrl = asset.optString("browser_download_url", "")
-                        break
+                        val url = asset.optString("browser_download_url", "")
+                        if (name.contains("release", ignoreCase = true)) {
+                            downloadUrl = url
+                            break
+                        } else if (fallbackApkUrl.isEmpty()) {
+                            fallbackApkUrl = url
+                        }
                     }
                 }
+            }
+
+            if (downloadUrl.isEmpty()) {
+                downloadUrl = fallbackApkUrl
             }
 
             if (downloadUrl.isEmpty()) {
