@@ -55,6 +55,22 @@ class MainActivity : ComponentActivity() {
                 // Real-time ban monitoring
                 val isBanned by deviceRepo.observeDeviceBan(deviceId).collectAsState(initial = false)
 
+                // In-App Auto Update Check
+                var updateInfo by remember { mutableStateOf<com.tollsplit.costmanagement.utils.UpdateInfo?>(null) }
+                var showUpdateDialog by remember { mutableStateOf(false) }
+
+                LaunchedEffect(Unit) {
+                    try {
+                        val info = com.tollsplit.costmanagement.utils.AppUpdateManager.checkForUpdate(this@MainActivity)
+                        if (info.hasUpdate) {
+                            updateInfo = info
+                            showUpdateDialog = true
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+
                 LaunchedEffect(deviceId, deviceUserName) {
                     try {
                         deviceRepo.registerDevice(deviceId, deviceUserName)
@@ -75,6 +91,13 @@ class MainActivity : ComponentActivity() {
                         deviceRepo = deviceRepo,
                         notifRepo = notifRepo
                     )
+
+                    if (showUpdateDialog && updateInfo != null) {
+                        com.tollsplit.costmanagement.ui.components.UpdateDialog(
+                            updateInfo = updateInfo!!,
+                            onDismiss = { showUpdateDialog = false }
+                        )
+                    }
                 }
             }
         }

@@ -113,6 +113,9 @@ fun SettingsScreen(
     var showDevicesModal by remember { mutableStateOf(false) }
     var showUserNameDialog by remember { mutableStateOf(false) }
 
+    var checkingForUpdate by remember { mutableStateOf(false) }
+    var updateInfoForDialog by remember { mutableStateOf<com.tollsplit.costmanagement.utils.UpdateInfo?>(null) }
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -429,7 +432,71 @@ fun SettingsScreen(
             }
         }
 
+        // 5. App Version & Updates Card
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, BorderColor, RoundedCornerShape(16.dp)),
+                colors = CardDefaults.cardColors(containerColor = CardDark),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text("App Version", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = TextPrimary)
+                            Text(
+                                "v${com.tollsplit.costmanagement.utils.AppUpdateManager.getCurrentVersionName(context)}",
+                                fontSize = 13.sp,
+                                color = TextSecondary
+                            )
+                        }
+
+                        Button(
+                            onClick = {
+                                checkingForUpdate = true
+                                coroutineScope.launch {
+                                    try {
+                                        val info = com.tollsplit.costmanagement.utils.AppUpdateManager.checkForUpdate(context)
+                                        checkingForUpdate = false
+                                        if (info.hasUpdate) {
+                                            updateInfoForDialog = info
+                                        } else {
+                                            Toast.makeText(context, "You are on the latest version!", Toast.LENGTH_SHORT).show()
+                                        }
+                                    } catch (e: Exception) {
+                                        checkingForUpdate = false
+                                        Toast.makeText(context, "Update check failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            },
+                            enabled = !checkingForUpdate,
+                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal)
+                        ) {
+                            Text(
+                                if (checkingForUpdate) "Checking..." else "Check for Updates",
+                                color = BgDark,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
         item { Spacer(modifier = Modifier.height(32.dp)) }
+    }
+
+    if (updateInfoForDialog != null) {
+        com.tollsplit.costmanagement.ui.components.UpdateDialog(
+            updateInfo = updateInfoForDialog!!,
+            onDismiss = { updateInfoForDialog = null }
+        )
     }
 
     // Role Password Dialog
