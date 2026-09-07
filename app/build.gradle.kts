@@ -6,11 +6,11 @@ plugins {
 
 val appVersionName: String = (project.findProperty("versionName") as? String)
     ?: System.getenv("VERSION_NAME")
-    ?: "1.0.2"
+    ?: "1.0.3"
 
 val appVersionCode: Int = (project.findProperty("versionCode") as? String
     ?: System.getenv("VERSION_CODE"))?.toIntOrNull()
-    ?: 2
+    ?: 3
 
 android {
     namespace = "com.tollsplit.costmanagement"

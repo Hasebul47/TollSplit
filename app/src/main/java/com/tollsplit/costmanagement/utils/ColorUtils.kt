@@ -13,7 +13,11 @@ object ColorUtils {
         return avatarPalette.random()
     }
 
+    private val colorCache = java.util.concurrent.ConcurrentHashMap<String, Color>()
+
     fun parseHexColor(hexString: String, fallback: Color = Color(0xFF10B981)): Color {
+        if (hexString.isBlank()) return fallback
+        colorCache[hexString]?.let { return it }
         return try {
             val cleanHex = hexString.removePrefix("#")
             val colorInt = when (cleanHex.length) {
@@ -21,7 +25,9 @@ object ColorUtils {
                 8 -> cleanHex.toLong(16)
                 else -> return fallback
             }
-            Color(colorInt)
+            val color = Color(colorInt)
+            colorCache[hexString] = color
+            color
         } catch (e: Exception) {
             fallback
         }

@@ -163,7 +163,7 @@ fun HistoryScreen(
                             EmptyStateCard(message = "No trips logged yet in this group.")
                         }
                     } else {
-                        items(trips) { trip ->
+                        items(trips, key = { it.id }) { trip ->
                             TripItemCard(
                                 trip = trip,
                                 onDeleteClick = { tripToDelete = trip }
@@ -186,7 +186,7 @@ fun HistoryScreen(
                             EmptyStateCard(message = "No transactions found.")
                         }
                     } else {
-                        items(transactions) { tx ->
+                        items(transactions, key = { it.id }) { tx ->
                             TransactionRow(tx)
                         }
                     }

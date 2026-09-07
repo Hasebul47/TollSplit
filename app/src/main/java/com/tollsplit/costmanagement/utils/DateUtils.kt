@@ -9,7 +9,7 @@ object DateUtils {
 
     private val ymdFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
     private val displayDateFormat = SimpleDateFormat("EEE, MMM d, yyyy", Locale.US)
-    private val dateTimeFormat = SimpleDateFormat("MMM d, yyyy hh:mm a", Locale.US)
+    private val dateTimeFormat = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.US)
     private val timeFormat = SimpleDateFormat("hh:mm a", Locale.US)
 
     fun getToday(): String {

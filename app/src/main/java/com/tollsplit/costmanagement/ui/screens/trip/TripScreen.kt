@@ -25,7 +25,9 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Paid
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -84,7 +86,10 @@ fun TripScreen(
     val coroutineScope = rememberCoroutineScope()
     val activeGroupId = prefManager.activeGroupId ?: ""
 
-    val members by memberRepo.getMembersFlow(activeGroupId).collectAsState(initial = emptyList())
+    val allMembers by memberRepo.getMembersFlow(activeGroupId).collectAsState(initial = emptyList())
+    val members = remember(allMembers) { allMembers.filter { it.is_active } }
+    val userRole by prefManager.userRoleFlow.collectAsState()
+    val isAdmin = userRole == "admin"
     var tripDate by remember { mutableStateOf(DateUtils.getToday()) }
     var tollAmountText by remember { mutableStateOf("80") }
     var note by remember { mutableStateOf("") }
@@ -144,6 +149,36 @@ fun TripScreen(
                 fontSize = 13.sp,
                 color = TextSecondary
             )
+        }
+
+        // Viewer Mode Warning Banner
+        if (!isAdmin) {
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, PrimaryTeal.copy(alpha = 0.3f), RoundedCornerShape(12.dp)),
+                    colors = CardDefaults.cardColors(containerColor = PrimaryTeal.copy(alpha = 0.08f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Shield,
+                            contentDescription = null,
+                            tint = PrimaryTeal,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "Viewer Mode (Read-Only): Only Admins can log new trips. Switch to Admin mode in Settings to log trips.",
+                            color = TextPrimary,
+                            fontSize = 13.sp
+                        )
+                    }
+                }
+            }
         }
 
         // Success message banner
@@ -313,9 +348,9 @@ fun TripScreen(
         }
 
         // Member Selection Items
-        items(members) { member ->
+        items(members, key = { it.id }) { member ->
             val isSelected = selectedMemberIds.value.contains(member.id)
-            val avatarColor = ColorUtils.parseHexColor(member.avatar_color)
+            val avatarColor = remember(member.avatar_color) { ColorUtils.parseHexColor(member.avatar_color) }
 
             Card(
                 modifier = Modifier
@@ -395,6 +430,10 @@ fun TripScreen(
             Spacer(modifier = Modifier.height(8.dp))
             Button(
                 onClick = {
+                    if (!isAdmin) {
+                        Toast.makeText(context, "Viewer mode: Switch to Admin in Settings to log trips", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
                     if (travelerCount == 0) {
                         Toast.makeText(context, "Please select at least one traveler", Toast.LENGTH_SHORT).show()
                         return@Button
@@ -408,12 +447,24 @@ fun TripScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
-                enabled = !isSubmitting && travelerCount > 0 && toll > 0,
-                colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
+                enabled = isAdmin && !isSubmitting && travelerCount > 0 && toll > 0,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isAdmin) PrimaryTeal else SurfaceElevated,
+                    disabledContainerColor = SurfaceElevated
+                ),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 if (isSubmitting) {
                     CircularProgressIndicator(modifier = Modifier.size(22.dp), color = BgDark)
+                } else if (!isAdmin) {
+                    Icon(Icons.Default.Lock, contentDescription = null, tint = TextMuted)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Admin Mode Required to Log Trip",
+                        color = TextMuted,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
                 } else {
                     Icon(Icons.Default.DirectionsCar, contentDescription = null, tint = BgDark)
                     Spacer(modifier = Modifier.width(8.dp))

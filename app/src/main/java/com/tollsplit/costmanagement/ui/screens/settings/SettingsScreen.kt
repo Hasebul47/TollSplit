@@ -93,8 +93,7 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-
-    var userRole by remember { mutableStateOf(prefManager.userRole) }
+    val userRole by prefManager.userRoleFlow.collectAsState()
     var activeGroupId by remember { mutableStateOf(prefManager.activeGroupId ?: "") }
     var myDeviceUserName by remember { mutableStateOf(prefManager.deviceUserName) }
 
@@ -192,7 +191,6 @@ fun SettingsScreen(
                         Button(
                             onClick = {
                                 if (userRole != "viewer") {
-                                    userRole = "viewer"
                                     prefManager.userRole = "viewer"
                                     Toast.makeText(context, "Switched to Viewer role", Toast.LENGTH_SHORT).show()
                                 }
@@ -253,11 +251,13 @@ fun SettingsScreen(
                             Text("Groups", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = TextPrimary)
                         }
 
-                        IconButton(onClick = {
-                            editingGroup = null
-                            showGroupModal = true
-                        }) {
-                            Icon(Icons.Default.Add, contentDescription = "Add Group", tint = PrimaryTeal)
+                        if (userRole == "admin") {
+                            IconButton(onClick = {
+                                editingGroup = null
+                                showGroupModal = true
+                            }) {
+                                Icon(Icons.Default.Add, contentDescription = "Add Group", tint = PrimaryTeal)
+                            }
                         }
                     }
 
@@ -310,11 +310,13 @@ fun SettingsScreen(
                                 }
                             }
 
-                            IconButton(onClick = {
-                                editingGroup = group
-                                showGroupModal = true
-                            }) {
-                                Icon(Icons.Default.Edit, contentDescription = "Edit Group", tint = TextSecondary, modifier = Modifier.size(18.dp))
+                            if (userRole == "admin") {
+                                IconButton(onClick = {
+                                    editingGroup = group
+                                    showGroupModal = true
+                                }) {
+                                    Icon(Icons.Default.Edit, contentDescription = "Edit Group", tint = TextSecondary, modifier = Modifier.size(18.dp))
+                                }
                             }
                         }
                     }
@@ -379,53 +381,47 @@ fun SettingsScreen(
             }
         }
 
-        // 4. Admin Management Section (Broadcast & Connected Devices)
-        item {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, BorderColor, RoundedCornerShape(16.dp)),
-                colors = CardDefaults.cardColors(containerColor = CardDark),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Admin Tools", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = TextPrimary)
-                    Spacer(modifier = Modifier.height(12.dp))
+        // 4. Admin Management Section (Broadcast & Connected Devices - Admin Only)
+        if (userRole == "admin") {
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(1.dp, BorderColor, RoundedCornerShape(16.dp)),
+                    colors = CardDefaults.cardColors(containerColor = CardDark),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text("Admin Tools", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = TextPrimary)
+                        Spacer(modifier = Modifier.height(12.dp))
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Button(
-                            onClick = {
-                                if (userRole == "admin") {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Button(
+                                onClick = {
                                     showBroadcastDialog = true
-                                } else {
-                                    Toast.makeText(context, "Admin role required", Toast.LENGTH_SHORT).show()
-                                }
-                            },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = SurfaceElevated)
-                        ) {
-                            Icon(Icons.Default.Campaign, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Broadcast", color = TextPrimary, fontSize = 13.sp)
-                        }
+                                },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = SurfaceElevated)
+                            ) {
+                                Icon(Icons.Default.Campaign, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Broadcast", color = TextPrimary, fontSize = 13.sp)
+                            }
 
-                        Button(
-                            onClick = {
-                                if (userRole == "admin") {
+                            Button(
+                                onClick = {
                                     showDevicesModal = true
-                                } else {
-                                    Toast.makeText(context, "Admin role required", Toast.LENGTH_SHORT).show()
-                                }
-                            },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = SurfaceElevated)
-                        ) {
-                            Icon(Icons.Default.Devices, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Devices (${devices.size})", color = TextPrimary, fontSize = 13.sp)
+                                },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = SurfaceElevated)
+                            ) {
+                                Icon(Icons.Default.Devices, contentDescription = null, tint = PrimaryTeal, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Devices (${devices.size})", color = TextPrimary, fontSize = 13.sp)
+                            }
                         }
                     }
                 }
@@ -506,7 +502,6 @@ fun SettingsScreen(
             message = "Enter the admin password to switch to Admin mode.",
             onConfirm = {
                 showAdminPasswordDialog = false
-                userRole = "admin"
                 prefManager.userRole = "admin"
                 Toast.makeText(context, "Admin mode activated", Toast.LENGTH_SHORT).show()
             },

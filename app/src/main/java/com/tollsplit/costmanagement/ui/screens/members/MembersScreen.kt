@@ -17,17 +17,21 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -45,6 +49,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -55,6 +60,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tollsplit.costmanagement.data.model.Member
@@ -67,6 +73,7 @@ import com.tollsplit.costmanagement.ui.theme.CardDark
 import com.tollsplit.costmanagement.ui.theme.PrimaryTeal
 import com.tollsplit.costmanagement.ui.theme.StatusDanger
 import com.tollsplit.costmanagement.ui.theme.StatusSuccess
+import com.tollsplit.costmanagement.ui.theme.StatusWarning
 import com.tollsplit.costmanagement.ui.theme.SurfaceElevated
 import com.tollsplit.costmanagement.ui.theme.TextMuted
 import com.tollsplit.costmanagement.ui.theme.TextPrimary
@@ -86,6 +93,9 @@ fun MembersScreen(
     val activeGroupId = prefManager.activeGroupId ?: ""
 
     val members by memberRepo.getMembersFlow(activeGroupId).collectAsState(initial = emptyList())
+    val userRole by prefManager.userRoleFlow.collectAsState()
+    val isAdmin = userRole == "admin"
+    var selectedStatusTab by remember { mutableIntStateOf(0) } // 0 = All, 1 = Active, 2 = Inactive
     var searchQuery by remember { mutableStateOf("") }
 
     // Dialog states
@@ -103,8 +113,14 @@ fun MembersScreen(
     var showAdminPasswordDialog by remember { mutableStateOf(false) }
     var pendingAdminAction by remember { mutableStateOf<(() -> Unit)?>(null) }
 
-    val filteredMembers = members.filter {
-        it.name.contains(searchQuery, ignoreCase = true) || it.phone.contains(searchQuery)
+    val filteredMembers = members.filter { m ->
+        val matchesSearch = m.name.contains(searchQuery, ignoreCase = true) || m.phone.contains(searchQuery)
+        val matchesStatus = when (selectedStatusTab) {
+            1 -> m.is_active
+            2 -> !m.is_active
+            else -> true
+        }
+        matchesSearch && matchesStatus
     }
 
     LaunchedEffect(selectedMemberForDetail) {
@@ -119,12 +135,14 @@ fun MembersScreen(
     Scaffold(
         containerColor = BgDark,
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAddMemberDialog = true },
-                containerColor = PrimaryTeal,
-                contentColor = BgDark
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Add Member")
+            if (isAdmin) {
+                FloatingActionButton(
+                    onClick = { showAddMemberDialog = true },
+                    containerColor = PrimaryTeal,
+                    contentColor = BgDark
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Add Member")
+                }
             }
         }
     ) { paddingValues ->
@@ -137,17 +155,42 @@ fun MembersScreen(
         ) {
             item {
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Group Members",
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary
-                )
-                Text(
-                    text = "${members.size} active members in this group",
-                    fontSize = 13.sp,
-                    color = TextSecondary
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "Group Members",
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                        val activeCount = members.count { it.is_active }
+                        Text(
+                            text = "$activeCount active members in this group",
+                            fontSize = 13.sp,
+                            color = TextSecondary
+                        )
+                    }
+
+                    if (!isAdmin) {
+                        Box(
+                            modifier = Modifier
+                                .background(PrimaryTeal.copy(alpha = 0.12f), RoundedCornerShape(12.dp))
+                                .border(1.dp, PrimaryTeal.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = "VIEWER (READ-ONLY)",
+                                color = PrimaryTeal,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
             }
 
             // Search Bar
@@ -180,8 +223,39 @@ fun MembersScreen(
                 )
             }
 
+            // Status Filter Tabs
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val activeCount = members.count { it.is_active }
+                    val inactiveCount = members.count { !it.is_active }
+                    val tabs = listOf("All (${members.size})", "Active ($activeCount)", "Inactive ($inactiveCount)")
+                    tabs.forEachIndexed { index, title ->
+                        val selected = selectedStatusTab == index
+                        Box(
+                            modifier = Modifier
+                                .background(
+                                    if (selected) PrimaryTeal else SurfaceElevated,
+                                    RoundedCornerShape(20.dp)
+                                )
+                                .clickable { selectedStatusTab = index }
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = title,
+                                color = if (selected) BgDark else TextSecondary,
+                                fontSize = 12.sp,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+            }
+
             // Members List
-            items(filteredMembers) { member ->
+            items(filteredMembers, key = { it.id }) { member ->
                 MemberCard(
                     member = member,
                     onClick = { selectedMemberForDetail = member }
@@ -218,7 +292,7 @@ fun MembersScreen(
                         )
                     }
                     Spacer(modifier = Modifier.width(12.dp))
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = member.name,
                             fontWeight = FontWeight.Bold,
@@ -233,6 +307,21 @@ fun MembersScreen(
                             )
                         }
                     }
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                if (member.is_active) StatusSuccess.copy(alpha = 0.15f) else StatusDanger.copy(alpha = 0.15f),
+                                RoundedCornerShape(8.dp)
+                            )
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = if (member.is_active) "ACTIVE" else "INACTIVE",
+                            color = if (member.is_active) StatusSuccess else StatusDanger,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             },
             text = {
@@ -245,7 +334,22 @@ fun MembersScreen(
                         colors = CardDefaults.cardColors(containerColor = SurfaceElevated)
                     ) {
                         Column(modifier = Modifier.padding(14.dp)) {
-                            Text("Current Balance", fontSize = 12.sp, color = TextSecondary)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("Current Balance", fontSize = 12.sp, color = TextSecondary)
+                                if (!member.is_active) {
+                                    Text(
+                                        "Excluded from group total",
+                                        fontSize = 11.sp,
+                                        color = StatusDanger,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 CurrencyUtils.formatCurrency(member.balance),
                                 fontSize = 22.sp,
@@ -298,69 +402,141 @@ fun MembersScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Action buttons
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
+                    if (!isAdmin) {
+                        // Read-only Viewer Notice
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(PrimaryTeal.copy(alpha = 0.08f), RoundedCornerShape(10.dp))
+                                .border(1.dp, PrimaryTeal.copy(alpha = 0.25f), RoundedCornerShape(10.dp))
+                                .padding(12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "Viewer Mode: Only Admins can modify members, toggle status, or log deposits. Switch to Admin mode in Settings.",
+                                fontSize = 12.sp,
+                                color = PrimaryTeal,
+                                fontWeight = FontWeight.Medium,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    } else {
+                        // Admin action buttons
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = {
+                                    depositMember = member
+                                    depositType = "deposit"
+                                    showDepositDialog = true
+                                    selectedMemberForDetail = null
+                                },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal)
+                            ) {
+                                Icon(Icons.Default.Payments, contentDescription = null, tint = BgDark, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Deposit", color = BgDark, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+
+                            Button(
+                                onClick = {
+                                    depositMember = member
+                                    depositType = "deduction"
+                                    showDepositDialog = true
+                                    selectedMemberForDetail = null
+                                },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = SurfaceElevated)
+                            ) {
+                                Text("Deduct", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Active / Inactive toggle button
                         Button(
                             onClick = {
-                                depositMember = member
-                                depositType = "deposit"
-                                showDepositDialog = true
-                                selectedMemberForDetail = null
-                            },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal)
-                        ) {
-                            Icon(Icons.Default.Payments, contentDescription = null, tint = BgDark, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Deposit", color = BgDark, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        }
-
-                        Button(
-                            onClick = {
-                                depositMember = member
-                                depositType = "deduction"
-                                showDepositDialog = true
-                                selectedMemberForDetail = null
-                            },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = SurfaceElevated)
-                        ) {
-                            Text("Deduct", color = TextPrimary, fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        IconButton(onClick = {
-                            editMember = member
-                            showEditDialog = true
-                            selectedMemberForDetail = null
-                        }) {
-                            Icon(Icons.Default.Edit, contentDescription = "Edit", tint = TextSecondary)
-                        }
-
-                        IconButton(onClick = {
-                            pendingAdminAction = {
+                                val newActiveState = !member.is_active
                                 coroutineScope.launch {
                                     try {
-                                        memberRepo.deactivateMember(member.id)
-                                        Toast.makeText(context, "${member.name} deactivated", Toast.LENGTH_SHORT).show()
+                                        memberRepo.setMemberActiveStatus(member.id, newActiveState)
+                                        val msg = if (newActiveState) {
+                                            "${member.name} activated! Balance restored to group total."
+                                        } else {
+                                            "${member.name} set to Inactive. Balance excluded from group total."
+                                        }
+                                        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
                                         selectedMemberForDetail = null
                                     } catch (e: Exception) {
                                         Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
                                     }
                                 }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (member.is_active) StatusWarning.copy(alpha = 0.2f) else StatusSuccess.copy(alpha = 0.2f)
+                            ),
+                            border = BorderStroke(
+                                1.dp,
+                                if (member.is_active) StatusWarning else StatusSuccess
+                            )
+                        ) {
+                            Icon(
+                                imageVector = if (member.is_active) Icons.Default.Block else Icons.Default.Check,
+                                contentDescription = null,
+                                tint = if (member.is_active) StatusWarning else StatusSuccess,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (member.is_active) "Set Inactive (Exclude Balance)" else "Set Active (Include Balance)",
+                                color = if (member.is_active) StatusWarning else StatusSuccess,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    editMember = member
+                                    showEditDialog = true
+                                    selectedMemberForDetail = null
+                                },
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary),
+                                border = BorderStroke(1.dp, BorderColor)
+                            ) {
+                                Icon(Icons.Default.Edit, contentDescription = "Edit", tint = TextSecondary, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Edit Member", fontSize = 12.sp)
                             }
-                            showAdminPasswordDialog = true
-                        }) {
-                            Icon(Icons.Default.Delete, contentDescription = "Deactivate", tint = StatusDanger)
+
+                            IconButton(onClick = {
+                                pendingAdminAction = {
+                                    coroutineScope.launch {
+                                        try {
+                                            memberRepo.deleteMember(member.id)
+                                            Toast.makeText(context, "${member.name} deleted", Toast.LENGTH_SHORT).show()
+                                            selectedMemberForDetail = null
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                }
+                                showAdminPasswordDialog = true
+                            }) {
+                                Icon(Icons.Default.Delete, contentDescription = "Delete", tint = StatusDanger)
+                            }
                         }
                     }
                 }
@@ -645,16 +821,22 @@ fun MembersScreen(
 
 @Composable
 fun MemberCard(member: Member, onClick: () -> Unit) {
-    val avatarColor = ColorUtils.parseHexColor(member.avatar_color)
+    val avatarColor = remember(member.avatar_color) { ColorUtils.parseHexColor(member.avatar_color) }
     val status = CurrencyUtils.getBalanceStatus(member.balance)
     val statusColor = CurrencyUtils.getBalanceColor(member.balance)
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, BorderColor, RoundedCornerShape(14.dp))
+            .border(
+                1.dp,
+                if (!member.is_active) BorderColor.copy(alpha = 0.5f) else BorderColor,
+                RoundedCornerShape(14.dp)
+            )
             .clickable { onClick() },
-        colors = CardDefaults.cardColors(containerColor = CardDark),
+        colors = CardDefaults.cardColors(
+            containerColor = if (!member.is_active) CardDark.copy(alpha = 0.65f) else CardDark
+        ),
         shape = RoundedCornerShape(14.dp)
     ) {
         Row(
@@ -666,7 +848,10 @@ fun MemberCard(member: Member, onClick: () -> Unit) {
             Box(
                 modifier = Modifier
                     .size(44.dp)
-                    .background(avatarColor, CircleShape),
+                    .background(
+                        if (member.is_active) avatarColor else avatarColor.copy(alpha = 0.5f),
+                        CircleShape
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -680,12 +865,30 @@ fun MemberCard(member: Member, onClick: () -> Unit) {
             Spacer(modifier = Modifier.width(14.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = member.name,
-                    color = TextPrimary,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 16.sp
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = member.name,
+                        color = if (member.is_active) TextPrimary else TextSecondary,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 16.sp
+                    )
+                    if (!member.is_active) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Box(
+                            modifier = Modifier
+                                .background(StatusDanger.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
+                                .border(1.dp, StatusDanger.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "INACTIVE",
+                                color = StatusDanger,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
                 if (member.phone.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(2.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -708,19 +911,22 @@ fun MemberCard(member: Member, onClick: () -> Unit) {
             Column(horizontalAlignment = Alignment.End) {
                 Text(
                     text = CurrencyUtils.formatCurrency(member.balance),
-                    color = statusColor,
+                    color = if (member.is_active) statusColor else statusColor.copy(alpha = 0.6f),
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Box(
                     modifier = Modifier
-                        .background(statusColor.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                        .background(
+                            (if (member.is_active) statusColor else TextMuted).copy(alpha = 0.15f),
+                            RoundedCornerShape(8.dp)
+                        )
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = status,
-                        color = statusColor,
+                        text = if (member.is_active) status else "Inactive",
+                        color = if (member.is_active) statusColor else TextMuted,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold
                     )

@@ -106,6 +106,9 @@ fun DashboardScreen(
         mutableStateOf(prefManager.lastDismissedNotificationId == latestNotification?.id)
     }
 
+    val role by prefManager.userRoleFlow.collectAsState()
+    val members by memberRepo.getMembersFlow(currentGroupId).collectAsState(initial = emptyList())
+
     LaunchedEffect(groups) {
         if (currentGroupId.isEmpty() && groups.isNotEmpty()) {
             val first = groups.first()
@@ -117,7 +120,7 @@ fun DashboardScreen(
         }
     }
 
-    LaunchedEffect(currentGroupId) {
+    LaunchedEffect(currentGroupId, members) {
         if (currentGroupId.isNotEmpty()) {
             withContext(Dispatchers.IO) {
                 val stats = groupRepo.getGroupStats(currentGroupId)
@@ -186,7 +189,6 @@ fun DashboardScreen(
                 }
 
                 // Role Pill
-                val role = prefManager.userRole
                 val roleColor = if (role == "admin") StatusWarning else PrimaryTeal
                 Box(
                     modifier = Modifier
@@ -398,7 +400,7 @@ fun DashboardScreen(
                 }
             }
         } else {
-            items(transactions) { tx ->
+            items(transactions, key = { it.id }) { tx ->
                 TransactionRow(tx)
             }
         }
@@ -412,7 +414,7 @@ fun DashboardScreen(
 @Composable
 fun TransactionRow(tx: Transaction) {
     val isDeposit = tx.type == "deposit"
-    val avatarColor = ColorUtils.parseHexColor(tx.avatar_color)
+    val avatarColor = remember(tx.avatar_color) { ColorUtils.parseHexColor(tx.avatar_color) }
 
     Card(
         modifier = Modifier
@@ -467,9 +469,10 @@ fun TransactionRow(tx: Transaction) {
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = DateUtils.getRelativeTime(tx.created_at),
+                    text = DateUtils.formatDateTime(tx.created_at),
                     color = TextMuted,
-                    fontSize = 11.sp
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium
                 )
             }
         }

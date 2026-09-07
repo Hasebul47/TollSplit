@@ -2,6 +2,9 @@ package com.tollsplit.costmanagement.utils
 
 import android.content.Context
 import android.content.SharedPreferences
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.util.UUID
 
 class PreferenceManager(context: Context) {
@@ -17,13 +20,19 @@ class PreferenceManager(context: Context) {
         private const val KEY_REMEMBER_ADMIN = "remember_admin"
     }
 
+    private val _userRoleFlow = MutableStateFlow(prefs.getString(KEY_USER_ROLE, "viewer") ?: "viewer")
+    val userRoleFlow: StateFlow<String> = _userRoleFlow.asStateFlow()
+
     var activeGroupId: String?
         get() = prefs.getString(KEY_ACTIVE_GROUP_ID, null)
         set(value) = prefs.edit().putString(KEY_ACTIVE_GROUP_ID, value).apply()
 
     var userRole: String
         get() = prefs.getString(KEY_USER_ROLE, "viewer") ?: "viewer"
-        set(value) = prefs.edit().putString(KEY_USER_ROLE, value).apply()
+        set(value) {
+            prefs.edit().putString(KEY_USER_ROLE, value).apply()
+            _userRoleFlow.value = value
+        }
 
     var deviceId: String
         get() {

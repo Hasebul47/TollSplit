@@ -44,6 +44,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableHighRefreshRate()
 
         val prefManager = PreferenceManager(this)
         val groupRepo = GroupRepository()
@@ -111,6 +112,32 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+    }
+
+    private fun enableHighRefreshRate() {
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                val modes = display?.supportedModes ?: emptyArray()
+                val maxMode = modes.maxByOrNull { it.refreshRate }
+                if (maxMode != null && maxMode.refreshRate >= 90f) {
+                    val params = window.attributes
+                    params.preferredDisplayModeId = maxMode.modeId
+                    params.preferredRefreshRate = maxMode.refreshRate
+                    window.attributes = params
+                }
+            } else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                @Suppress("DEPRECATION")
+                val modes = windowManager.defaultDisplay?.supportedModes ?: emptyArray()
+                val maxMode = modes.maxByOrNull { it.refreshRate }
+                if (maxMode != null && maxMode.refreshRate >= 90f) {
+                    val params = window.attributes
+                    params.preferredDisplayModeId = maxMode.modeId
+                    window.attributes = params
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 }

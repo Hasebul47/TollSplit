@@ -22,25 +22,30 @@ data class MemberStats(
 
 class MemberRepository(private val db: FirebaseFirestore = FirebaseFirestore.getInstance()) {
 
-    fun getMembersFlow(groupId: String): Flow<List<Member>> = callbackFlow {
+    fun getMembersFlow(groupId: String, onlyActive: Boolean = false): Flow<List<Member>> = callbackFlow {
         if (groupId.isEmpty()) {
             trySend(emptyList())
             close()
             return@callbackFlow
         }
-        val listener = db.collection("members")
-            .whereEqualTo("group_id", groupId)
-            .whereEqualTo("is_active", true)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    close(error)
-                    return@addSnapshotListener
-                }
-                val members = snapshot?.documents?.mapNotNull { doc ->
-                    doc.toObject(Member::class.java)?.copy(id = doc.id)
-                }?.sortedBy { it.name.lowercase() } ?: emptyList()
-                trySend(members)
+        val query = if (onlyActive) {
+            db.collection("members")
+                .whereEqualTo("group_id", groupId)
+                .whereEqualTo("is_active", true)
+        } else {
+            db.collection("members")
+                .whereEqualTo("group_id", groupId)
+        }
+        val listener = query.addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                close(error)
+                return@addSnapshotListener
             }
+            val members = snapshot?.documents?.mapNotNull { doc ->
+                doc.toObject(Member::class.java)?.copy(id = doc.id)
+            }?.sortedBy { it.name.lowercase() } ?: emptyList()
+            trySend(members)
+        }
         awaitClose { listener.remove() }
     }
 
@@ -100,8 +105,14 @@ class MemberRepository(private val db: FirebaseFirestore = FirebaseFirestore.get
         db.collection("members").document(id).update(updates).await()
     }
 
-    suspend fun deactivateMember(id: String) = withContext(Dispatchers.IO) {
-        db.collection("members").document(id).update("is_active", false).await()
+    suspend fun deactivateMember(id: String) = setMemberActiveStatus(id, false)
+
+    suspend fun setMemberActiveStatus(id: String, isActive: Boolean) = withContext(Dispatchers.IO) {
+        db.collection("members").document(id).update("is_active", isActive).await()
+    }
+
+    suspend fun deleteMember(id: String) = withContext(Dispatchers.IO) {
+        db.collection("members").document(id).delete().await()
     }
 
     suspend fun addDeposit(groupId: String, memberId: String, amount: Double, note: String, type: String = "deposit") = withContext(Dispatchers.IO) {
