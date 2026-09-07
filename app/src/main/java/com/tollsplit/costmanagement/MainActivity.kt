@@ -11,8 +11,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -22,6 +25,7 @@ import com.tollsplit.costmanagement.data.repository.MemberRepository
 import com.tollsplit.costmanagement.data.repository.NotificationRepository
 import com.tollsplit.costmanagement.data.repository.TransactionRepository
 import com.tollsplit.costmanagement.data.repository.TripRepository
+import com.tollsplit.costmanagement.ui.components.UpdateDialog
 import com.tollsplit.costmanagement.ui.navigation.BottomNavBar
 import com.tollsplit.costmanagement.ui.navigation.Screen
 import com.tollsplit.costmanagement.ui.screens.banned.BannedScreen
@@ -32,7 +36,9 @@ import com.tollsplit.costmanagement.ui.screens.settings.SettingsScreen
 import com.tollsplit.costmanagement.ui.screens.trip.TripScreen
 import com.tollsplit.costmanagement.ui.theme.BgDark
 import com.tollsplit.costmanagement.ui.theme.TollSplitTheme
+import com.tollsplit.costmanagement.utils.AppUpdateManager
 import com.tollsplit.costmanagement.utils.PreferenceManager
+import com.tollsplit.costmanagement.utils.UpdateInfo
 
 class MainActivity : ComponentActivity() {
 
@@ -49,6 +55,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             TollSplitTheme {
+                val context = LocalContext.current
                 val deviceId = prefManager.deviceId
                 val deviceUserName = prefManager.deviceUserName
 
@@ -56,12 +63,12 @@ class MainActivity : ComponentActivity() {
                 val isBanned by deviceRepo.observeDeviceBan(deviceId).collectAsState(initial = false)
 
                 // In-App Auto Update Check
-                var updateInfo by remember { mutableStateOf<com.tollsplit.costmanagement.utils.UpdateInfo?>(null) }
+                var updateInfo by remember { mutableStateOf<UpdateInfo?>(null) }
                 var showUpdateDialog by remember { mutableStateOf(false) }
 
                 LaunchedEffect(Unit) {
                     try {
-                        val info = com.tollsplit.costmanagement.utils.AppUpdateManager.checkForUpdate(this@MainActivity)
+                        val info = AppUpdateManager.checkForUpdate(context)
                         if (info.hasUpdate) {
                             updateInfo = info
                             showUpdateDialog = true
@@ -93,7 +100,7 @@ class MainActivity : ComponentActivity() {
                     )
 
                     if (showUpdateDialog && updateInfo != null) {
-                        com.tollsplit.costmanagement.ui.components.UpdateDialog(
+                        UpdateDialog(
                             updateInfo = updateInfo!!,
                             onDismiss = { showUpdateDialog = false }
                         )
