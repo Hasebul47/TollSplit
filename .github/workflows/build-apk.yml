@@ -1,0 +1,71 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ "master", "main" ]
+  pull_request:
+    branches: [ "master", "main" ]
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build Type'
+        required: true
+        default: 'debug'
+        type: choice
+        options:
+          - debug
+          - release
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant Execute Permission to Gradlew
+        run: chmod +x gradlew
+
+      - name: Decode Google Services (if secret is provided)
+        env:
+          GOOGLE_SERVICES_SECRET: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_SECRET" ]; then
+            echo "$GOOGLE_SERVICES_SECRET" > app/google-services.json
+            echo "Successfully injected google-services.json from GitHub Secrets"
+          else
+            echo "Using repository app/google-services.json"
+          fi
+
+      - name: Build Debug APK
+        if: "${{ github.event.inputs.build_type != 'release' }}"
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Build Release APK
+        if: "${{ github.event.inputs.build_type == 'release' }}"
+        run: ./gradlew assembleRelease --stacktrace
+
+      - name: Upload Debug APK Artifact
+        if: "${{ github.event.inputs.build_type != 'release' }}"
+        uses: actions/upload-artifact@v4
+        with:
+          name: TollSplit-Debug-APK
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 14
+
+      - name: Upload Release APK Artifact
+        if: "${{ github.event.inputs.build_type == 'release' }}"
+        uses: actions/upload-artifact@v4
+        with:
+          name: TollSplit-Release-APK
+          path: app/build/outputs/apk/release/*.apk
+          retention-days: 14

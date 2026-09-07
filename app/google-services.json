@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "144464043325",
+    "project_id": "tollsplit-277bf",
+    "storage_bucket": "tollsplit-277bf.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:144464043325:android:d6438a22ec208f870a6c0b",
+        "android_client_info": {
+          "package_name": "com.tollsplit.costmanagement"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBscDwGwJv6Z-V_QnRaBbVnIlp8rL_yw0M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:144464043325:android:d6438a22ec208f870a6c0c",
+        "android_client_info": {
+          "package_name": "com.tollsplit.costmanagement.debug"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBscDwGwJv6Z-V_QnRaBbVnIlp8rL_yw0M"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
