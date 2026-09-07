@@ -141,12 +141,8 @@ object AppUpdateManager {
 
     fun getCurrentVersionName(context: Context): String {
         return try {
-            val pInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                context.packageManager.getPackageInfo(context.packageName, PackageManager.PackageInfoFlags.of(0))
-            } else {
-                @Suppress("DEPRECATION")
-                context.packageManager.getPackageInfo(context.packageName, 0)
-            }
+            @Suppress("DEPRECATION")
+            val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
             pInfo.versionName ?: "1.0.0"
         } catch (e: Exception) {
             "1.0.0"

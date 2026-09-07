@@ -195,7 +195,7 @@ fun UpdateDialog(
                         }
                         Spacer(modifier = Modifier.height(6.dp))
                         LinearProgressIndicator(
-                            progress = { downloadProgress / 100f },
+                            progress = downloadProgress / 100f,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(6.dp),
