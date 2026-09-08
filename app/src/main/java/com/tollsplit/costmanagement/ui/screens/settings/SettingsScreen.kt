@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -57,13 +58,16 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.tollsplit.costmanagement.R
 import com.tollsplit.costmanagement.data.model.Device
 import com.tollsplit.costmanagement.data.model.Group
 import com.tollsplit.costmanagement.data.repository.DeviceRepository
@@ -443,13 +447,24 @@ fun SettingsScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
-                            Text("App Version", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = TextPrimary)
-                            Text(
-                                "v${com.tollsplit.costmanagement.utils.AppUpdateManager.getCurrentVersionName(context)}",
-                                fontSize = 13.sp,
-                                color = TextSecondary
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Image(
+                                painter = painterResource(id = R.drawable.expressway_toll_logo),
+                                contentDescription = "Expressway Toll Logo",
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .border(1.dp, PrimaryTeal.copy(alpha = 0.5f), RoundedCornerShape(10.dp))
                             )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text("TollSplit Expressway", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = TextPrimary)
+                                Text(
+                                    "v${com.tollsplit.costmanagement.utils.AppUpdateManager.getCurrentVersionName(context)}",
+                                    fontSize = 13.sp,
+                                    color = TextSecondary
+                                )
+                            }
                         }
 
                         Button(

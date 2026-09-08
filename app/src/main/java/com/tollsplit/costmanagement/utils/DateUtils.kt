@@ -89,4 +89,42 @@ object DateUtils {
 
         return Pair(start, end)
     }
+
+    fun getThisMonthRange(): Pair<String, String> {
+        val cal = Calendar.getInstance()
+        val year = cal.get(Calendar.YEAR)
+        val month = cal.get(Calendar.MONTH) + 1
+        return getMonthStartEnd(year, month)
+    }
+
+    fun getLastMonthRange(): Pair<String, String> {
+        val cal = Calendar.getInstance()
+        cal.add(Calendar.MONTH, -1)
+        val year = cal.get(Calendar.YEAR)
+        val month = cal.get(Calendar.MONTH) + 1
+        return getMonthStartEnd(year, month)
+    }
+
+    fun getLast7DaysRange(): Pair<String, String> {
+        val endCal = Calendar.getInstance()
+        val end = ymdFormat.format(endCal.time)
+        val startCal = Calendar.getInstance()
+        startCal.add(Calendar.DAY_OF_YEAR, -6)
+        val start = ymdFormat.format(startCal.time)
+        return Pair(start, end)
+    }
+
+    fun getLast30DaysRange(): Pair<String, String> {
+        val endCal = Calendar.getInstance()
+        val end = ymdFormat.format(endCal.time)
+        val startCal = Calendar.getInstance()
+        startCal.add(Calendar.DAY_OF_YEAR, -29)
+        val start = ymdFormat.format(startCal.time)
+        return Pair(start, end)
+    }
+
+    fun formatDateRange(startDate: String, endDate: String): String {
+        if (startDate == endDate) return formatDate(startDate)
+        return "${formatDate(startDate)} – ${formatDate(endDate)}"
+    }
 }

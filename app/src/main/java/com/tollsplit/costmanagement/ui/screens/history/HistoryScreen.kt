@@ -9,9 +9,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -20,10 +22,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.FilterAlt
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -33,6 +40,8 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.TabRowDefaults
@@ -54,7 +63,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.tollsplit.costmanagement.data.model.Trip
+import com.tollsplit.costmanagement.data.repository.MemberCostSummaryReport
+import com.tollsplit.costmanagement.data.repository.MemberDateTripCost
+import com.tollsplit.costmanagement.data.repository.MemberSpending
 import com.tollsplit.costmanagement.data.repository.TransactionRepository
 import com.tollsplit.costmanagement.data.repository.TripReport
 import com.tollsplit.costmanagement.data.repository.TripRepository
@@ -87,29 +100,42 @@ fun HistoryScreen(
     val activeGroupId = prefManager.activeGroupId ?: ""
 
     var selectedTabIndex by remember { mutableIntStateOf(0) } // 0 = Trips, 1 = Transactions, 2 = Report
-    val tabs = listOf("Trips", "Transactions", "Monthly Report")
+    val tabs = listOf("Trips", "Transactions", "Cost Report")
 
     val trips by tripRepo.getTripsFlow(activeGroupId).collectAsState(initial = emptyList())
     val transactions by txRepo.getTransactionsFlow(activeGroupId, 100).collectAsState(initial = emptyList())
 
-    // Month Report State
+    // Report State
+    var isCustomRangeMode by remember { mutableStateOf(false) }
     var reportMonth by remember { mutableIntStateOf(DateUtils.getCurrentMonth()) }
     var reportYear by remember { mutableIntStateOf(DateUtils.getCurrentYear()) }
+    var customStartDate by remember { mutableStateOf(DateUtils.getThisMonthRange().first) }
+    var customEndDate by remember { mutableStateOf(DateUtils.getThisMonthRange().second) }
+    var selectedPresetIndex by remember { mutableIntStateOf(0) }
     var reportData by remember { mutableStateOf(TripReport()) }
+    var selectedMemberForSummary by remember { mutableStateOf<MemberSpending?>(null) }
 
     // Trip Delete State
     var tripToDelete by remember { mutableStateOf<Trip?>(null) }
     var showAdminPasswordDialog by remember { mutableStateOf(false) }
 
+    fun getActiveDateRange(): Pair<String, String> {
+        return if (!isCustomRangeMode) {
+            DateUtils.getMonthStartEnd(reportYear, reportMonth)
+        } else {
+            Pair(customStartDate, customEndDate)
+        }
+    }
+
     fun loadReport() {
         if (activeGroupId.isEmpty()) return
-        val (start, end) = DateUtils.getMonthStartEnd(reportYear, reportMonth)
+        val (start, end) = getActiveDateRange()
         coroutineScope.launch {
             reportData = tripRepo.getReportByDateRange(activeGroupId, start, end)
         }
     }
 
-    LaunchedEffect(activeGroupId, reportMonth, reportYear, selectedTabIndex) {
+    LaunchedEffect(activeGroupId, reportMonth, reportYear, isCustomRangeMode, customStartDate, customEndDate, selectedTabIndex) {
         if (selectedTabIndex == 2) {
             loadReport()
         }
@@ -194,56 +220,278 @@ fun HistoryScreen(
                 }
             }
             2 -> {
-                // Monthly Report Tab
+                // Cost Report Tab
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    // Month Navigator
+                    // Mode Toggle: Monthly vs Custom Range
                     item {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(SurfaceDark, RoundedCornerShape(12.dp))
+                                .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                                .padding(4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .background(
+                                        if (!isCustomRangeMode) PrimaryTeal else Color.Transparent,
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .clickable { isCustomRangeMode = false }
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.CalendarMonth,
+                                        contentDescription = null,
+                                        tint = if (!isCustomRangeMode) BgDark else TextSecondary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Monthly",
+                                        color = if (!isCustomRangeMode) BgDark else TextSecondary,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp
+                                    )
+                                }
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .background(
+                                        if (isCustomRangeMode) PrimaryTeal else Color.Transparent,
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .clickable { isCustomRangeMode = true }
+                                    .padding(vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.DateRange,
+                                        contentDescription = null,
+                                        tint = if (isCustomRangeMode) BgDark else TextSecondary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Custom Range",
+                                        color = if (isCustomRangeMode) BgDark else TextSecondary,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if (!isCustomRangeMode) {
+                        // Month Navigator
+                        item {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .border(1.dp, BorderColor, RoundedCornerShape(14.dp)),
+                                colors = CardDefaults.cardColors(containerColor = CardDark)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    IconButton(onClick = {
+                                        if (reportMonth == 1) {
+                                            reportMonth = 12
+                                            reportYear -= 1
+                                        } else {
+                                            reportMonth -= 1
+                                        }
+                                    }) {
+                                        Icon(Icons.Default.ChevronLeft, contentDescription = "Previous Month", tint = PrimaryTeal)
+                                    }
+
+                                    Text(
+                                        text = "${DateUtils.getMonthName(reportMonth)} $reportYear",
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = TextPrimary
+                                    )
+
+                                    IconButton(onClick = {
+                                        if (reportMonth == 12) {
+                                            reportMonth = 1
+                                            reportYear += 1
+                                        } else {
+                                            reportMonth += 1
+                                        }
+                                    }) {
+                                        Icon(Icons.Default.ChevronRight, contentDescription = "Next Month", tint = PrimaryTeal)
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        // Custom Range Selector
+                        item {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .border(1.dp, BorderColor, RoundedCornerShape(14.dp)),
+                                colors = CardDefaults.cardColors(containerColor = CardDark)
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp)) {
+                                    Text("Preset Date Ranges", fontSize = 12.sp, color = TextSecondary, fontWeight = FontWeight.SemiBold)
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    // Presets Row
+                                    val presets = listOf("This Month", "Last 30 Days", "Last 7 Days", "Last Month")
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        presets.forEachIndexed { idx, title ->
+                                            val isSelected = selectedPresetIndex == idx
+                                            Box(
+                                                modifier = Modifier
+                                                    .background(
+                                                        if (isSelected) PrimaryTeal else SurfaceElevated,
+                                                        RoundedCornerShape(8.dp)
+                                                    )
+                                                    .border(
+                                                        1.dp,
+                                                        if (isSelected) PrimaryTeal else BorderColor,
+                                                        RoundedCornerShape(8.dp)
+                                                    )
+                                                    .clickable {
+                                                        selectedPresetIndex = idx
+                                                        val range = when (idx) {
+                                                            0 -> DateUtils.getThisMonthRange()
+                                                            1 -> DateUtils.getLast30DaysRange()
+                                                            2 -> DateUtils.getLast7DaysRange()
+                                                            3 -> DateUtils.getLastMonthRange()
+                                                            else -> DateUtils.getThisMonthRange()
+                                                        }
+                                                        customStartDate = range.first
+                                                        customEndDate = range.second
+                                                        loadReport()
+                                                    }
+                                                    .padding(horizontal = 8.dp, vertical = 6.dp)
+                                            ) {
+                                                Text(
+                                                    text = title,
+                                                    color = if (isSelected) BgDark else TextPrimary,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(12.dp))
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        OutlinedTextField(
+                                            value = customStartDate,
+                                            onValueChange = {
+                                                customStartDate = it
+                                                selectedPresetIndex = -1
+                                            },
+                                            label = { Text("Start Date", fontSize = 11.sp) },
+                                            placeholder = { Text("YYYY-MM-DD", fontSize = 11.sp) },
+                                            modifier = Modifier.weight(1f),
+                                            singleLine = true,
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedBorderColor = PrimaryTeal,
+                                                unfocusedBorderColor = BorderColor,
+                                                focusedTextColor = TextPrimary,
+                                                unfocusedTextColor = TextPrimary
+                                            )
+                                        )
+
+                                        OutlinedTextField(
+                                            value = customEndDate,
+                                            onValueChange = {
+                                                customEndDate = it
+                                                selectedPresetIndex = -1
+                                            },
+                                            label = { Text("End Date", fontSize = 11.sp) },
+                                            placeholder = { Text("YYYY-MM-DD", fontSize = 11.sp) },
+                                            modifier = Modifier.weight(1f),
+                                            singleLine = true,
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedBorderColor = PrimaryTeal,
+                                                unfocusedBorderColor = BorderColor,
+                                                focusedTextColor = TextPrimary,
+                                                unfocusedTextColor = TextPrimary
+                                            )
+                                        )
+
+                                        Button(
+                                            onClick = { loadReport() },
+                                            colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
+                                            modifier = Modifier.padding(top = 6.dp)
+                                        ) {
+                                            Text("Apply", color = BgDark, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Active Range Info Banner
+                    item {
+                        val activeRange = getActiveDateRange()
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .border(1.dp, BorderColor, RoundedCornerShape(14.dp)),
-                            colors = CardDefaults.cardColors(containerColor = CardDark)
+                                .border(1.dp, PrimaryTeal.copy(alpha = 0.3f), RoundedCornerShape(12.dp)),
+                            colors = CardDefaults.cardColors(containerColor = PrimaryTeal.copy(alpha = 0.08f))
                         ) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                                    .padding(horizontal = 14.dp, vertical = 10.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                IconButton(onClick = {
-                                    if (reportMonth == 1) {
-                                        reportMonth = 12
-                                        reportYear -= 1
-                                    } else {
-                                        reportMonth -= 1
-                                    }
-                                }) {
-                                    Icon(Icons.Default.ChevronLeft, contentDescription = "Previous Month", tint = PrimaryTeal)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.DateRange,
+                                        contentDescription = null,
+                                        tint = PrimaryTeal,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = DateUtils.formatDateRange(activeRange.first, activeRange.second),
+                                        color = PrimaryTeal,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp
+                                    )
                                 }
-
                                 Text(
-                                    text = "${DateUtils.getMonthName(reportMonth)} $reportYear",
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = TextPrimary
+                                    text = "${reportData.tripCount} Trips Total",
+                                    color = TextSecondary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium
                                 )
-
-                                IconButton(onClick = {
-                                    if (reportMonth == 12) {
-                                        reportMonth = 1
-                                        reportYear += 1
-                                    } else {
-                                        reportMonth += 1
-                                    }
-                                }) {
-                                    Icon(Icons.Default.ChevronRight, contentDescription = "Next Month", tint = PrimaryTeal)
-                                }
                             }
                         }
                     }
@@ -294,25 +542,34 @@ fun HistoryScreen(
 
                     // Member Spending Breakdown
                     item {
-                        Text(
-                            text = "Member Spending Breakdown",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = TextPrimary,
-                            modifier = Modifier.padding(top = 8.dp)
-                        )
+                        Column {
+                            Text(
+                                text = "Member Spending Breakdown",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary,
+                                modifier = Modifier.padding(top = 8.dp)
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Tap any person to view their date-wise cost summary report",
+                                fontSize = 12.sp,
+                                color = TextMuted
+                            )
+                        }
                     }
 
                     if (reportData.memberSpending.isEmpty()) {
                         item {
-                            EmptyStateCard(message = "No member trip spending recorded for this month.")
+                            EmptyStateCard(message = "No member trip spending recorded for this date range.")
                         }
                     } else {
-                        items(reportData.memberSpending) { ms ->
+                        items(reportData.memberSpending, key = { it.memberId }) { ms ->
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .border(1.dp, BorderColor, RoundedCornerShape(12.dp)),
+                                    .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                                    .clickable { selectedMemberForSummary = ms },
                                 colors = CardDefaults.cardColors(containerColor = CardDark)
                             ) {
                                 Row(
@@ -323,7 +580,7 @@ fun HistoryScreen(
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .size(36.dp)
+                                            .size(38.dp)
                                             .background(ColorUtils.parseHexColor(ms.avatarColor), CircleShape),
                                         contentAlignment = Alignment.Center
                                     ) {
@@ -331,7 +588,7 @@ fun HistoryScreen(
                                             text = ms.memberName.take(1).uppercase(),
                                             color = Color.White,
                                             fontWeight = FontWeight.Bold,
-                                            fontSize = 14.sp
+                                            fontSize = 15.sp
                                         )
                                     }
 
@@ -345,16 +602,16 @@ fun HistoryScreen(
                                             color = TextPrimary
                                         )
                                         Text(
-                                            text = "${ms.tripCount} trips",
+                                            text = "${ms.tripCount} trips • Tap for date-wise list →",
                                             fontSize = 12.sp,
-                                            color = TextSecondary
+                                            color = PrimaryTeal
                                         )
                                     }
 
                                     Text(
                                         text = CurrencyUtils.formatCurrency(ms.totalSpent),
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 15.sp,
+                                        fontSize = 16.sp,
                                         color = PrimaryTeal
                                     )
                                 }
@@ -437,6 +694,26 @@ fun HistoryScreen(
             onDismiss = {
                 showAdminPasswordDialog = false
             }
+        )
+    }
+
+    // Individual Member Date-Wise Cost Summary Dialog
+    selectedMemberForSummary?.let { ms ->
+        val activeRange = getActiveDateRange()
+        val summaryReport = remember(ms, reportData) {
+            tripRepo.getMemberCostSummary(
+                memberId = ms.memberId,
+                memberName = ms.memberName,
+                avatarColor = ms.avatarColor,
+                startDate = activeRange.first,
+                endDate = activeRange.second,
+                report = reportData
+            )
+        }
+
+        MemberCostSummaryDialog(
+            report = summaryReport,
+            onDismiss = { selectedMemberForSummary = null }
         )
     }
 }
@@ -589,6 +866,284 @@ fun EmptyStateCard(message: String) {
                 color = TextMuted,
                 fontSize = 14.sp
             )
+        }
+    }
+}
+
+@Composable
+fun MemberCostSummaryDialog(
+    report: MemberCostSummaryReport,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.88f)
+                .border(1.dp, BorderColor, RoundedCornerShape(20.dp)),
+            colors = CardDefaults.cardColors(containerColor = CardDark),
+            shape = RoundedCornerShape(20.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(18.dp)
+            ) {
+                // Header: Avatar, Name, Close Button
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .background(ColorUtils.parseHexColor(report.avatarColor), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = report.memberName.take(1).uppercase(),
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        Column {
+                            Text(
+                                text = report.memberName,
+                                color = TextPrimary,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 17.sp
+                            )
+                            Text(
+                                text = "Cost Summary Report",
+                                color = TextSecondary,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close",
+                            tint = TextSecondary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Date Range Badge
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(SurfaceElevated, RoundedCornerShape(10.dp))
+                        .border(1.dp, BorderColor, RoundedCornerShape(10.dp))
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.DateRange,
+                            contentDescription = null,
+                            tint = PrimaryTeal,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = DateUtils.formatDateRange(report.startDate, report.endDate),
+                            color = PrimaryTeal,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // KPI Stats Cards: Total Cost, Trips Count, Avg/Trip
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Card(
+                        modifier = Modifier
+                            .weight(1f)
+                            .border(1.dp, BorderColor, RoundedCornerShape(12.dp)),
+                        colors = CardDefaults.cardColors(containerColor = SurfaceDark)
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Text("Total Spent", fontSize = 11.sp, color = TextSecondary)
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = CurrencyUtils.formatCurrency(report.totalCost),
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = PrimaryTeal
+                            )
+                        }
+                    }
+
+                    Card(
+                        modifier = Modifier
+                            .weight(0.9f)
+                            .border(1.dp, BorderColor, RoundedCornerShape(12.dp)),
+                        colors = CardDefaults.cardColors(containerColor = SurfaceDark)
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Text("Trips", fontSize = 11.sp, color = TextSecondary)
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "${report.totalTrips}",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                        }
+                    }
+
+                    Card(
+                        modifier = Modifier
+                            .weight(1.1f)
+                            .border(1.dp, BorderColor, RoundedCornerShape(12.dp)),
+                        colors = CardDefaults.cardColors(containerColor = SurfaceDark)
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Text("Avg / Trip", fontSize = 11.sp, color = TextSecondary)
+                            Spacer(modifier = Modifier.height(2.dp))
+                            val avgCost = if (report.totalTrips > 0) report.totalCost / report.totalTrips else 0.0
+                            Text(
+                                text = CurrencyUtils.formatCurrency(avgCost),
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Text(
+                    text = "Date-wise Trip Breakdown",
+                    color = TextPrimary,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Scrollable List of Trips
+                if (report.tripsByDate.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "No trips recorded for this member in this date range.",
+                            color = TextMuted,
+                            fontSize = 13.sp
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(report.tripsByDate, key = { it.tripId }) { item ->
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .border(1.dp, BorderColor, RoundedCornerShape(12.dp)),
+                                colors = CardDefaults.cardColors(containerColor = SurfaceDark)
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                imageVector = Icons.Default.DirectionsCar,
+                                                contentDescription = null,
+                                                tint = PrimaryTeal,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = DateUtils.formatDate(item.tripDate),
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 13.sp,
+                                                color = TextPrimary
+                                            )
+                                        }
+
+                                        Text(
+                                            text = CurrencyUtils.formatCurrency(item.memberCostShare),
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp,
+                                            color = PrimaryTeal
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(6.dp))
+
+                                    Text(
+                                        text = "Total Toll: ${CurrencyUtils.formatCurrency(item.totalToll)} (${item.travelerCount} travelers)",
+                                        fontSize = 11.sp,
+                                        color = TextSecondary
+                                    )
+
+                                    if (item.coTravelers.isNotEmpty()) {
+                                        Spacer(modifier = Modifier.height(3.dp))
+                                        Text(
+                                            text = "With: ${item.coTravelers.joinToString(", ")}",
+                                            fontSize = 11.sp,
+                                            color = TextMuted
+                                        )
+                                    }
+
+                                    if (item.note.isNotBlank()) {
+                                        Spacer(modifier = Modifier.height(3.dp))
+                                        Text(
+                                            text = "Note: ${item.note}",
+                                            fontSize = 11.sp,
+                                            color = TextMuted
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryTeal),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Close", color = BgDark, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                }
+            }
         }
     }
 }

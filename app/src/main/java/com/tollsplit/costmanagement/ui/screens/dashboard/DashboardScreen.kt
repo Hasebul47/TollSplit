@@ -1,5 +1,6 @@
 package com.tollsplit.costmanagement.ui.screens.dashboard
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -47,11 +48,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.tollsplit.costmanagement.R
 import com.tollsplit.costmanagement.data.model.Group
 import com.tollsplit.costmanagement.data.model.Transaction
 import com.tollsplit.costmanagement.data.repository.GroupRepository
@@ -150,15 +154,28 @@ fun DashboardScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box {
-                    Row(
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.expressway_toll_logo),
+                        contentDescription = "Expressway Toll Logo",
                         modifier = Modifier
-                            .background(SurfaceElevated, RoundedCornerShape(12.dp))
-                            .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
-                            .clickable { showGroupDropdown = true }
-                            .padding(horizontal = 14.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .border(1.5.dp, PrimaryTeal, CircleShape)
+                    )
+
+                    Box {
+                        Row(
+                            modifier = Modifier
+                                .background(SurfaceElevated, RoundedCornerShape(12.dp))
+                                .border(1.dp, BorderColor, RoundedCornerShape(12.dp))
+                                .clickable { showGroupDropdown = true }
+                                .padding(horizontal = 14.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                         Text(
                             text = currentGroup?.name ?: "Select Group",
                             color = TextPrimary,
@@ -186,6 +203,7 @@ fun DashboardScreen(
                             )
                         }
                     }
+                }
                 }
 
                 // Role Pill

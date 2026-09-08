@@ -22,6 +22,27 @@ data class MemberSpending(
     val tripCount: Int
 )
 
+data class MemberDateTripCost(
+    val tripId: String,
+    val tripDate: String,
+    val totalToll: Double,
+    val memberCostShare: Double,
+    val travelerCount: Int,
+    val note: String,
+    val coTravelers: List<String>
+)
+
+data class MemberCostSummaryReport(
+    val memberId: String,
+    val memberName: String,
+    val avatarColor: String,
+    val startDate: String,
+    val endDate: String,
+    val totalCost: Double,
+    val totalTrips: Int,
+    val tripsByDate: List<MemberDateTripCost>
+)
+
 data class TripReport(
     val totalToll: Double = 0.0,
     val tripCount: Int = 0,
@@ -242,6 +263,53 @@ class TripRepository(private val db: FirebaseFirestore = FirebaseFirestore.getIn
             tripCount = filteredTrips.size,
             trips = filteredTrips,
             memberSpending = sortedMemberSpending
+        )
+    }
+
+    fun getMemberCostSummary(
+        memberId: String,
+        memberName: String,
+        avatarColor: String,
+        startDate: String,
+        endDate: String,
+        report: TripReport
+    ): MemberCostSummaryReport {
+        val memberTrips = mutableListOf<MemberDateTripCost>()
+        var totalCost = 0.0
+
+        for (trip in report.trips) {
+            val memberPart = trip.members.find { it.member_id == memberId }
+            if (memberPart != null) {
+                totalCost += memberPart.cost_share
+                val coTravelers = trip.members
+                    .filter { it.member_id != memberId }
+                    .map { it.member_name.ifBlank { "Member" } }
+
+                memberTrips.add(
+                    MemberDateTripCost(
+                        tripId = trip.id,
+                        tripDate = trip.trip_date,
+                        totalToll = trip.total_toll,
+                        memberCostShare = memberPart.cost_share,
+                        travelerCount = trip.traveler_count,
+                        note = trip.note,
+                        coTravelers = coTravelers
+                    )
+                )
+            }
+        }
+
+        return MemberCostSummaryReport(
+            memberId = memberId,
+            memberName = memberName,
+            avatarColor = avatarColor,
+            startDate = startDate,
+            endDate = endDate,
+            totalCost = totalCost,
+            totalTrips = memberTrips.size,
+            tripsByDate = memberTrips.sortedWith(
+                compareByDescending<MemberDateTripCost> { it.tripDate }
+            )
         )
     }
 }
