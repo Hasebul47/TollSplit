@@ -6,11 +6,11 @@ plugins {
 
 val appVersionName: String = (project.findProperty("versionName") as? String)
     ?: System.getenv("VERSION_NAME")
-    ?: "1.0.4"
+    ?: "1.0.5"
 
 val appVersionCode: Int = (project.findProperty("versionCode") as? String
     ?: System.getenv("VERSION_CODE"))?.toIntOrNull()
-    ?: 4
+    ?: 5
 
 android {
     namespace = "com.tollsplit.costmanagement"
@@ -29,10 +29,19 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("tollsplit.keystore")
+            storePassword = "tollsplit_release_pass"
+            keyAlias = "tollsplit"
+            keyPassword = "tollsplit_release_pass"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -40,6 +49,7 @@ android {
         }
         debug {
             isDebuggable = true
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 

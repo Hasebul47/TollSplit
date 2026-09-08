@@ -63,6 +63,8 @@ import com.tollsplit.costmanagement.data.repository.GroupStats
 import com.tollsplit.costmanagement.data.repository.MemberRepository
 import com.tollsplit.costmanagement.data.repository.NotificationRepository
 import com.tollsplit.costmanagement.data.repository.TransactionRepository
+import com.tollsplit.costmanagement.ui.components.CenteredStatCard
+import com.tollsplit.costmanagement.ui.components.CompactStatCard
 import com.tollsplit.costmanagement.ui.components.StatCard
 import com.tollsplit.costmanagement.ui.navigation.Screen
 import com.tollsplit.costmanagement.ui.theme.AccentCyan
@@ -281,20 +283,23 @@ fun DashboardScreen(
 
         // 3. Stat Cards Grid
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                StatCard(
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                // Centered Hero Card: Total Group Balance
+                CenteredStatCard(
                     title = "Total Group Balance",
                     value = CurrencyUtils.formatCurrency(groupStats.totalBalance),
                     icon = Icons.Default.AccountBalanceWallet,
                     iconColor = StatusSuccess,
                     iconBgColor = StatusSuccessBg
                 )
+
+                // Row 1: Total Spent & Total Deposited (Compact / Little Small)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Box(modifier = Modifier.weight(1f)) {
-                        StatCard(
+                        CompactStatCard(
                             title = "Total Spent",
                             value = CurrencyUtils.formatCurrency(groupStats.totalSpent),
                             icon = Icons.Default.Payments,
@@ -303,8 +308,8 @@ fun DashboardScreen(
                         )
                     }
                     Box(modifier = Modifier.weight(1f)) {
-                        StatCard(
-                            title = "Deposited",
+                        CompactStatCard(
+                            title = "Total Deposited",
                             value = CurrencyUtils.formatCurrency(groupStats.totalDeposited),
                             icon = Icons.Default.ReceiptLong,
                             iconColor = AccentCyan,
@@ -312,24 +317,27 @@ fun DashboardScreen(
                         )
                     }
                 }
+
+                // Row 2: Total Trips & Active Members (Compact)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Box(modifier = Modifier.weight(1f)) {
-                        StatCard(
-                            title = "Active Members",
-                            value = groupStats.memberCount.toString(),
-                            icon = Icons.Default.Group,
+                        CompactStatCard(
+                            title = "Total Trips",
+                            value = "${groupStats.tripCount}",
+                            subtitle = if (groupStats.todayTrips > 0) "(${groupStats.todayTrips} today)" else null,
+                            icon = Icons.Default.DirectionsCar,
                             iconColor = PrimaryTeal,
                             iconBgColor = PrimaryTeal.copy(alpha = 0.15f)
                         )
                     }
                     Box(modifier = Modifier.weight(1f)) {
-                        StatCard(
-                            title = "Today's Trips",
-                            value = groupStats.todayTrips.toString(),
-                            icon = Icons.Default.DirectionsCar,
+                        CompactStatCard(
+                            title = "Active Members",
+                            value = "${groupStats.memberCount}",
+                            icon = Icons.Default.Group,
                             iconColor = StatusWarning,
                             iconBgColor = StatusWarningBg
                         )

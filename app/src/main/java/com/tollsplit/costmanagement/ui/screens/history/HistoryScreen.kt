@@ -98,6 +98,8 @@ fun HistoryScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val activeGroupId = prefManager.activeGroupId ?: ""
+    val role by prefManager.userRoleFlow.collectAsState()
+    val isAdmin = role == "admin"
 
     var selectedTabIndex by remember { mutableIntStateOf(0) } // 0 = Trips, 1 = Transactions, 2 = Report
     val tabs = listOf("Trips", "Transactions", "Cost Report")
@@ -192,7 +194,8 @@ fun HistoryScreen(
                         items(trips, key = { it.id }) { trip ->
                             TripItemCard(
                                 trip = trip,
-                                onDeleteClick = { tripToDelete = trip }
+                                canDelete = isAdmin,
+                                onDeleteClick = { if (isAdmin) tripToDelete = trip }
                             )
                         }
                     }
@@ -674,7 +677,7 @@ fun HistoryScreen(
         )
     }
 
-    if (showAdminPasswordDialog && tripToDelete != null) {
+    if (showAdminPasswordDialog && tripToDelete != null && isAdmin) {
         val trip = tripToDelete!!
         AdminPasswordDialog(
             title = "Confirm Delete & Refund",
@@ -719,7 +722,11 @@ fun HistoryScreen(
 }
 
 @Composable
-fun TripItemCard(trip: Trip, onDeleteClick: () -> Unit) {
+fun TripItemCard(
+    trip: Trip,
+    canDelete: Boolean = true,
+    onDeleteClick: () -> Unit
+) {
     var expanded by remember { mutableStateOf(false) }
 
     Card(
@@ -773,16 +780,18 @@ fun TripItemCard(trip: Trip, onDeleteClick: () -> Unit) {
                     fontSize = 13.sp
                 )
 
-                IconButton(
-                    onClick = onDeleteClick,
-                    modifier = Modifier.size(28.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
-                        contentDescription = "Delete Trip",
-                        tint = StatusDanger.copy(alpha = 0.8f),
-                        modifier = Modifier.size(18.dp)
-                    )
+                if (canDelete) {
+                    IconButton(
+                        onClick = onDeleteClick,
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Delete Trip",
+                            tint = StatusDanger.copy(alpha = 0.8f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 }
             }
 
