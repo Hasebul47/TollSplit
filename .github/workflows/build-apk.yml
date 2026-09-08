@@ -74,6 +74,18 @@ jobs:
             echo "Using repository app/google-services.json"
           fi
 
+      - name: Setup Permanent Signing Keystore
+        run: |
+          if [ ! -f app/tollsplit.jks ]; then
+            echo "Generating permanent tollsplit.jks with JDK keytool..."
+            keytool -genkeypair -v -keystore app/tollsplit.jks -alias tollsplit -keyalg RSA -keysize 2048 -validity 10000 -storepass tollsplit_release_pass -keypass tollsplit_release_pass -dname "CN=TollSplit App, O=TollSplit, C=BD" -storetype JKS
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add app/tollsplit.jks
+            git commit -m "ci: commit permanent tollsplit.jks keystore [skip ci]" || true
+            git push origin main || true
+          fi
+
       - name: Build Android APKs
         run: |
           ./gradlew assembleRelease assembleDebug -PversionName=$VERSION_NAME -PversionCode=$VERSION_CODE --stacktrace

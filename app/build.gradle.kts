@@ -31,7 +31,7 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = file("tollsplit.keystore")
+            storeFile = file("tollsplit.jks")
             storePassword = "tollsplit_release_pass"
             keyAlias = "tollsplit"
             keyPassword = "tollsplit_release_pass"
