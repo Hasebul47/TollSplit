@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tollsplit.costmanagement.ui.theme.BorderColor
 import com.tollsplit.costmanagement.ui.theme.CardDark
+import com.tollsplit.costmanagement.ui.theme.PrimaryTeal
 import com.tollsplit.costmanagement.ui.theme.TextPrimary
 import com.tollsplit.costmanagement.ui.theme.TextSecondary
 
